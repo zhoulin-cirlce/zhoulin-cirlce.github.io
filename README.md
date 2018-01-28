@@ -1,9 +1,9 @@
-# HuxBlog Boilerplate
+# Zhoulin-cirlce Blog Boilerplate
 
-##### This is the boilerplate of [zhoulin-cirlce Blog](https://github.com/Huxpro/huxpro.github.io), all documents is over there!
+##### This is the boilerplate of [zhoulin-cirlce Blog](https://github.com/zhoulin-cirlce/zhoulin-cirlce.github.io), all documents is over there!
 
-#### [View Boilerplate &rarr;](http://huangxuan.me/huxblog-boilerplate/)
+<!--#### [View Boilerplate &rarr;](http://huangxuan.me/huxblog-boilerplate/)-->
 
-#### [View Live zhoulin-cirlce Blog &rarr;](http://huangxuan.me)
+<!--#### [View Live zhoulin-cirlce Blog &rarr;](http://huangxuan.me)-->
 
-## If you like zhoulin-cirlce Blog, Please star [huxpro.github.io repo](https://github.com/Huxpro/huxpro.github.io) instead of this! Thank you!
+## If you like zhoulin-cirlce Blog, Please star [zhoulin-cirlce.github.io repo](https://github.com/zhoulin-cirlce/zhoulin-cirlce.github.io) instead of this! Thank you!

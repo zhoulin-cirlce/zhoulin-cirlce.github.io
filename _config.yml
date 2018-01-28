@@ -12,11 +12,7 @@ baseurl: ""                             # for example, '/blog' if your blog host
 
 # SNS settings
 RSS: false
-weibo_username:     zhoulin-cirlce
-zhihu_username:     zhoulin-cirlce
 github_username:    zhoulin-cirlce
-twitter_username:   zhoulin-cirlce
-#facebook_username:  huxpro
 # linkedin_username:  firstname-lastname-idxxxx
 
 
@@ -47,8 +43,6 @@ kramdown:
 
 
 
-# Disqus settings
-disqus_username: hux
 
 # Netease setttings
 netease_comment: false
@@ -59,15 +53,12 @@ netease_comment: false
 # Baidu Analytics 
 # ba_track_id: [your track id]
 
-# Google Analytics
-ga_track_id: 'UA-49627206-1'            # Format: UA-xxxxxx-xx
-ga_domain: huangxuan.me
 
 
 
 # Sidebar settings
 sidebar: true                           # whether or not using Sidebar.
-sidebar-about-description: "写写代码，做做设计，<br>离开世界之前，一切都是过程"
+sidebar-about-description: "写写代码，分享生活，<br>你的选择,自己做主"
 sidebar-avatar: /img/avatar-circle.jpg      # use absolute URL, seeing it's used in both `/` and `/about/`
 
 
