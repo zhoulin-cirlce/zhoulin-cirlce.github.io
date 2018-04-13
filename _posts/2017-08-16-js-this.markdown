@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "从指向看JavaScript"
+title:      "从this看JavaScript"
 subtitle:   "JavaScript,this,call,apply"
 date:       2017-08-16
 author:     "zhoulin-cirlce"
@@ -12,8 +12,7 @@ tags:
 
 摘要: this?原型/原型链？继承？闭包？我们不妨从指向这个概念去理解JavaScript中的这些点！
 ### 前言
-开写前大家先来理解一下指向：指向，即目标方向、所对的方位。
-很多人刚刚接触前端甚至一些“老”前端都经常会在JavaScript中所谓的难点，如this，原型，继承，闭包等这些概念中迷失了自我。接下来这篇文章会把我自己对于JavaScript中这些点通过指向的概念做个总结并分享给大家，希望可以帮助大家更好的了解这些所谓的难点。
+很多人刚刚接触前端甚至一些“老”前端都经常会在JavaScript中所谓的难点，如this，原型，继承，闭包等这些概念中迷失了自我。接下来这篇文章会把我自己对于JavaScript中这些点通过this指向的概念做个总结并分享给大家，希望可以帮助大家更好的了解这些所谓的难点。
 #### 一、this
 this是什么？其实它本身就是一种指向。this指向可以分为以下几种情况
 
