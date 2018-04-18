@@ -1,0 +1,292 @@
+---
+layout:     post
+title:      "确认过眼神，你是喜欢Stream的人"
+subtitle:   "可读流, node, Stream,readStream"
+date:       2017-12-13
+author:     "zhoulin-cirlce"
+header-img: "img/post-bg-js-version.jpg"
+tags:
+    - node
+---
+摘要：在学习Node的过程中，Stream流是常用的东东，在了解怎么使用它的同时，我们应该要深入了解它的具体实现。今天的主要带大家来写一写可读流的具体实现，就过来，就过来，上码啦！
+### 码前准备
+在写代码之前我们首先要整理下思路，我们要做什么，以及怎么来做。本篇文章以文件可读流为例，一个可读流大体分为四步：
+1. 初始化参数
+2. 打开文件
+3. 读取文件
+4. 结束，关闭文件
+### 一、先来一波调用
+1. 先引入一个readStream模块
+2. 实例化并传入参数
+```javascript
+var readStream=require('readStream.js');
+var rs=new readStream('test.txt',{
+    flags:'r',                  //打开文件的模式
+    autoClose:true,             //结束是否自动关闭
+    encoding:'utf8',            //字符编码
+    highWaterMark:3,            //每次读取的字节数
+    start:0,                    //从下标为多少的位置开始读取，默认以0开始
+    end:3,                      //结束下标位置
+});
+```
+3. 监听data事件，接收读到的值
+对于有读取数据时，会触发data事件，我们在此先监听data事件。关于事件的监听和触发，在node中用的是‘events’模块，如果不太了解的盆友，可以关注我哈，后续的文章会介绍到哦！本篇的重点是流，我们就先直接用了。
+```javascript
+rs.on('data',function(data){
+    console.log(data);
+})
+```
+### 二、接下来定义readStream这个模块
+#### 1.因为我们以文件的可读流来做的，在此我们要引入一个文件模块。还有一个事件模块，并且要继承它，每一个可读流都是‘events’的一个实例。
+首先我们先初始化参数：
+```js
+    var fs=require('fs');
+    var EventEmitter=require('events');
+    class readStream extends EventEmitter{
+        constructor(path,options){
+            super();
+            this.path=path;
+            this.flags=opitons.flags||'r';
+            this.autoClose=opitons.autoClose||true;
+            this.encoding=options.encoding||null;
+            this.highWaterMark=options.highWaterMark||64*1024;
+            this.start=options.start||0;
+            this.end=options.end;
+
+            this.pos=this.start;
+            this.buffer=Buffer.alloc(this.highWaterMark);
+            this.flowing=null;
+            this.open();
+        }
+    }
+```
+以上除了初始化传递进来的参数，还加了几个pos,buffer,open(),flowing,为什么要加这些呢？这些值是来做什么用的？我们在此做出解答：
+* pos:是用在存储每一次读取文件时，读取的位置。比如当highWater<end时，data有可能会触发多次，每次的位置应该是上次读取位置的下一个，pos就是用来记录这个位置的下标，所以初始值为start。
+* buffer：分配一个长度为this.highWaterMark的Buffer。
+* flowing:是指当前状态是否是流动的，有三个值，初始为null。当开始监听data事件时，值为true,则开始读取文件。当值为false时，暂停读取文件。为什么刚刚我说data可能会多次触发，因为当flowing被设为false时，data事件将停止触发。想要改变flowing的值，node提供了两个方法暂停pause()和恢复resume()。
+#### 2.读取一个文件应该先打开文件，我们来定义该方法：
+```js
+    open(){
+        fs.open(this.path,this.flags,(err,fd)=>{
+            if(err){
+                this.emit('err');
+            }
+            this.fd=fd;
+            this.emit('open');
+        });
+    }
+```
+2.1在打开文件的时候，如果文件打开报错，我们除了要触发错误事件外，还要注意一个参数。autoClose是指在文件读取完毕或抛出错误后，自己关闭文件。
+于是我们根据这个参数值，在现有的open方法中对抛错的情况做出优化。
+```js
+    open(){
+        fs.open(this.path,this.flags,(err,fd)=>{
+            if(err){
+                if(autoClose){
+                    if(typeof this.fd === 'number'){
+                        fs.close(this.fd,()=>{
+                            this.emit('close');
+                        });
+                    }
+                    this.emit('close');
+                }
+                this.emit('err');
+            }
+            this.fd=fd;
+            this.emit('open');
+        })
+    }
+```
+#### 3.打开文件后，并不是立马读取，而是要检查是否有data事件绑定监听！
+对此，我们要在构造函数内检查如果添加了data的事件监听
+```js
+    class readStream extends EventEmitter{
+        constructor(path,options){
+            super();
+            ...
+            this.on('newListener',(eventName,callback)=>{
+                if(eventName=='data'){
+                    this.flowing=true;
+                    this.read();
+                }
+            })
+        }
+    }
+```
+完成以上步骤后，我们要做的就是读取文件内容啦，下面来自定义一个read方法：
+* 先判断是否有读取到内容，若有读取到内容
+* --改变下次读取的起点位置
+* --获取到相同长度的Buffer空间
+* --若设了字符编码，要将data作相应的转换
+* --判断此时this.pos的位置是否已超出了结束位置
+* --如果folwing为true,则再次调用read方法
+* 读取不到内容则抛出一个错误，并关闭文件
+代码如下
+```js
+    read(){
+        let howToLength=this.end ? Math.min((this.end-this.pos),this.highWaterMark) : this.highWaterMark;
+        fs.read(this.fd,this.buffer,0,howToLength,this.pos,(err,bytesBase)=>{
+            if(bytesBase>0){
+                this.pos+=bytesBase;        
+                this.buf=this.buffer.slice(0,bytesBase);   
+                let data=this.encoding ? this.buffer.toString(this.encoding) : this.buffer.toString(); 
+                this.emit('data',data);
+            
+                if(this.end>this.pos){
+                    this.emit('end');
+                    if(autoClose){
+                        if(typeof this.fd === 'number'){
+                            fs.close(this.fd,()=>{
+                                this.emit('close');
+                            });
+                        }
+                        this.emit('close');
+                    }
+                }
+                if(flowing){
+                    this.read();
+                }
+            }else{
+                this.emit('err');
+                if(typeof this.fd === 'number'){
+                    if(autoClose){
+                        fs.close(this.fd,()=>{
+                            this.emit('close');
+                        });
+                    }
+                    this.emit('close');
+                }
+            }
+        })
+    }
+```
+到此，一个read方法就写的差不多了，但是有个问题是要注意的，open方法是异步的，有可能出现调用read方法时，this.fd还没有值。为了避免这个错误，我们改写一下read方法。
+```js
+    read(){
+        if(typeof this.fd !== 'number'){
+            this.once('open',()=>this.read());
+        }
+        ...
+    }
+```
+这样的话，一个基础的readStream类才算写完整。我们是不是要考虑下，有没有什么可以优化的地方？细心的伙伴是不是发现有重复的代码？
+对，就是文件的关闭，我们提出一个destory方法，用作关闭文件。
+```js
+    destory(){
+        if(typeof this.fd==='number'){
+            if(autoClose){
+                fs.close(this.fd,()=>{
+                    this.emit('close');
+                });
+                return ;
+            }
+            this.emit('close');
+        }
+    }
+```
+### 三、扩展
+方法的调用介绍变量flowing时，我们有提到'暂停'方法pause(),'重启'方法resume()来改变flowing的值。我们加入到代码中。
+1. 首先加入调用，我们在第一次读取数据后暂停读取，在3秒后继续读取。
+```js
+    rs.on('data',(data)=>{
+        console.log(data);
+        this.pause();
+    });
+    setTimeout(()=>{
+        this.resume();
+    },3000)
+```
+2. 这两个方法的调用也是一样简单：
+```js
+    pause(){
+        this.flowing=false;
+    }
+    resume(){
+        this.flowing=true;
+        this.read();
+    }
+```
+OK，大功告成了，下面整理出完整代码
+```js
+var fs=require('fs');
+var EventEmitter=require('events');
+class readStream extends EventEmitter{
+    constructor(path,options){
+        super();
+        this.path=path;
+        this.flages=options.flages||'r';
+        this.autoClose=options.autoClose||true;
+        this.encoding=options.encoding||null;
+        this.highWaterMark=options.highWaterMark||64*1024;
+        this.end=options.end;
+        this.start=opitons.start||0;
+
+        this.pos=this.start;
+        this.flowing=false;
+        this.buffer=Buffer.alloc(this.highWaterMark);
+        this.open();
+
+        this.on('newListener',(eventName,callback){
+            if(eventName=='data'){
+                this.flowing=true;
+                fs.read();
+            }
+        });
+        open(){
+            fs.open(this.path,this.flags,(err,fd){
+                if(err){
+                    if(this.autoClose){
+                        this.destory();
+                    }
+                    this.emit('err',err);
+                    return ;
+                }
+                this.fd=fd;
+                this.emit('open');
+
+        });
+        }
+        destory(){
+            if(typeof this.fd ='number'){
+                fs.close(this.fd,()=>{
+                    this.emit('close');
+                });
+                return ;
+            }
+            this.emit('close');
+        }
+        read(){
+            if(typeof this.fd !== 'number'){
+                return this.once('open',()=>this.read());
+            }
+            let howToLength=this.end ? Math.min((this.end-this.pos),this.highWaterMark) : this.highWaterMark;
+            fs.read(this.fd,this.buffer,0,howToLenghth,this.pos,(err,bytesBase)=>{
+                if(bytesBase>0){
+                    this.pos+=bytesBase;
+                    let buf=this.buffer.slice(0,bytesBase);
+                    let data=this.encoding ? this.buffer.toString(this.encoding) : this.buffer.toString();
+                    this.emit('data',data);
+                
+                    if(this.pos>this.end){
+                        this.emit('end');
+                        this.destory();
+                    }
+                    if(flowing){
+                        this.read()
+                    }
+                }else{
+                    this.emit('err');
+                    this.destory();
+                }
+            })   
+        }
+        pause(){
+            this.flowing=false;
+        }
+        resume(){
+            this.flowing=true;
+            this.read();
+        }
+    }
+}
+```
